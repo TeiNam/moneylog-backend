@@ -1,0 +1,29 @@
+# MoneyLog 백엔드 의존성
+# Python 3.12+
+
+# 웹 프레임워크
+fastapi==0.116.1
+uvicorn[standard]==0.34.2
+
+# ORM / 데이터베이스
+sqlalchemy[asyncio]==2.0.41
+asyncpg==0.30.0
+alembic==1.15.2
+
+# 데이터 검증
+pydantic[email]==2.11.5
+pydantic-settings==2.9.1
+
+# 인증
+python-jose[cryptography]==3.4.0
+bcrypt>=4.0.0
+
+# 파일 처리
+openpyxl>=3.1.0
+python-multipart>=0.0.20
+
+# HTTP 클라이언트
+httpx==0.28.1
+
+# AWS SDK (운영 환경 Secrets Manager / Bedrock)
+boto3==1.38.34
