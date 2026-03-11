@@ -15,6 +15,9 @@ ENV/
 # Environment variables
 .env
 
+# Kiro
+.kiro/
+
 # IDE
 .idea/
 .vscode/
