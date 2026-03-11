@@ -1,0 +1,43 @@
+# MoneyLog 로컬 개발 환경 Docker Compose 설정
+# 사용자가 외부 PostgreSQL(nas.rastalion.me:5444)을 사용 중이므로,
+# 이 Docker Compose는 로컬 개발 대안으로 제공됩니다.
+
+services:
+  # PostgreSQL 17 데이터베이스
+  db:
+    image: postgres:17
+    container_name: moneylog-db
+    environment:
+      POSTGRES_DB: moneylog
+      POSTGRES_USER: moneylog
+      POSTGRES_PASSWORD: moneylog-local-dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-schemas.sql:/docker-entrypoint-initdb.d/01-init-schemas.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U moneylog -d moneylog"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI 애플리케이션
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: moneylog-api
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Docker 내부 네트워크용 DATABASE_URL 오버라이드
+      DATABASE_URL: postgresql+asyncpg://moneylog:moneylog-local-dev@db:5432/moneylog
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
