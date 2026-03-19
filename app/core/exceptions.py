@@ -6,9 +6,12 @@ FastAPI 전역 예외 핸들러에서 HTTP 응답으로 변환된다.
 """
 
 import logging
+import re
+import traceback
 from typing import Any
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
@@ -95,9 +98,29 @@ class ConflictError(AppException):
         super().__init__(status_code=409, detail=detail)
 
 
+class ExternalServiceError(AppException):
+    """외부 서비스(S3, OAuth 제공자) 통신 오류 (502 Bad Gateway)."""
+
+    def __init__(self, detail: str = "외부 서비스 연동 중 오류가 발생했습니다") -> None:
+        super().__init__(status_code=502, detail=detail)
+
+
+def class_name_to_error_code(class_name: str) -> str:
+    """클래스명(CamelCase)을 UPPER_SNAKE_CASE 에러 코드로 변환한다.
+
+    예: DuplicateEmailError → DUPLICATE_EMAIL_ERROR
+        InvalidCredentialsError → INVALID_CREDENTIALS_ERROR
+        NotFoundError → NOT_FOUND_ERROR
+    """
+    # 대문자 앞에 언더스코어를 삽입하고 전체를 대문자로 변환
+    snake = re.sub(r"(?<=[a-z0-9])([A-Z])", r"_\1", class_name)
+    # 연속 대문자 처리 (예: HTTPError → HTTP_ERROR)
+    snake = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", snake)
+    return snake.upper()
+
 
 async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
-    """AppException을 HTTP JSON 응답으로 변환하는 전역 예외 핸들러."""
+    """AppException을 통일된 에러 응답 구조로 변환하는 전역 예외 핸들러."""
     logger.warning(
         "AppException 발생: status_code=%d, detail=%s, path=%s",
         exc.status_code,
@@ -106,10 +129,75 @@ async def app_exception_handler(request: Request, exc: AppException) -> JSONResp
     )
     return JSONResponse(
         status_code=exc.status_code,
-        content={"detail": exc.detail},
+        content={
+            "error_code": class_name_to_error_code(exc.__class__.__name__),
+            "message": exc.detail,
+            "details": None,
+        },
+    )
+
+
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    """RequestValidationError를 통일된 에러 응답 구조로 변환하는 핸들러."""
+    # 필드별 오류 정보를 {field, message} 배열로 변환
+    details = []
+    for error in exc.errors():
+        # loc 튜플에서 필드명 추출 (body → 필드명 순서)
+        loc = error.get("loc", ())
+        field = ".".join(str(part) for part in loc if part != "body")
+        details.append({
+            "field": field,
+            "message": error.get("msg", ""),
+        })
+
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error_code": "VALIDATION_ERROR",
+            "message": "입력값 검증에 실패했습니다",
+            "details": details,
+        },
+    )
+
+
+async def general_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """예상치 못한 예외를 통일된 에러 응답 구조로 변환하는 catch-all 핸들러.
+
+    production 환경에서는 스택 트레이스를 포함하지 않는다.
+    """
+    from app.core.config import get_settings
+
+    logger.error(
+        "처리되지 않은 예외 발생: %s, path=%s",
+        str(exc),
+        request.url.path,
+        exc_info=True,
+    )
+
+    settings = get_settings()
+    details = None
+
+    # 개발/스테이징 환경에서만 스택 트레이스 포함
+    if settings.APP_ENV != "production":
+        details = [{"trace": traceback.format_exc()}]
+
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error_code": "INTERNAL_SERVER_ERROR",
+            "message": "서버 내부 오류가 발생했습니다",
+            "details": details,
+        },
     )
 
 
 def register_exception_handlers(app: FastAPI) -> None:
-    """FastAPI 앱에 전역 예외 핸들러를 등록한다."""
+    """FastAPI 앱에 전역 예외 핸들러를 등록한다.
+
+    등록 순서: RequestValidationError → AppException → Exception
+    """
+    app.add_exception_handler(RequestValidationError, validation_exception_handler)  # type: ignore[arg-type]
     app.add_exception_handler(AppException, app_exception_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(Exception, general_exception_handler)  # type: ignore[arg-type]

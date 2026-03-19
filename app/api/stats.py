@@ -21,6 +21,7 @@ from app.schemas.stats import (
     YearlyStatsResponse,
 )
 from app.services.stats_service import StatsService
+from app.utils.timezone_utils import parse_date_param_to_date
 
 router = APIRouter(prefix="/stats", tags=["stats"])
 
@@ -45,13 +46,18 @@ def _build_service(db: AsyncSession) -> StatsService:
     summary="주간 통계 조회",
 )
 async def get_weekly_stats(
-    target_date: date = Query(..., alias="date"),
+    target_date: str = Query(..., alias="date", description="기준 날짜 (YYYY-MM-DD 또는 ISO 8601)"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> WeeklyStatsResponse:
-    """해당 날짜가 속한 주의 통계를 조회한다."""
+    """해당 날짜가 속한 주의 통계를 조회한다.
+
+    날짜 파라미터는 KST 기준으로 해석된다 (Requirements 4.3, 4.6).
+    """
+    # KST 기준 날짜 파싱
+    parsed_date = parse_date_param_to_date(target_date)
     service = _build_service(db)
-    return await service.get_weekly_stats(current_user, target_date)
+    return await service.get_weekly_stats(current_user, parsed_date)
 
 
 # ──────────────────────────────────────────────

@@ -6,17 +6,19 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.enums import FeedbackType
+from app.schemas.common import UTCDatetimeResponse
+from app.schemas.enums import enum_field
 
 
 class FeedbackCreateRequest(BaseModel):
     """피드백 생성 요청."""
     transaction_id: int
-    feedback_type: FeedbackType
+    feedback_type: FeedbackType = enum_field(FeedbackType)
     original_value: str = Field(..., min_length=1, max_length=200)
     corrected_value: str = Field(..., min_length=1, max_length=200)
 
 
-class FeedbackResponse(BaseModel):
+class FeedbackResponse(UTCDatetimeResponse):
     """피드백 응답."""
     id: UUID
     user_id: UUID

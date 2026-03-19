@@ -11,6 +11,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.enums import Area, TransactionType
+from app.schemas.common import UTCDatetimeResponse
 
 
 # ──────────────────────────────────────────────
@@ -55,7 +56,7 @@ class SortOrderItem(BaseModel):
 # ──────────────────────────────────────────────
 
 
-class CategoryResponse(BaseModel):
+class CategoryResponse(UTCDatetimeResponse):
     """카테고리 응답 스키마."""
 
     id: UUID

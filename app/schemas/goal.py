@@ -11,6 +11,8 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.enums import GoalType
+from app.schemas.common import UTCDatetimeResponse
+from app.schemas.enums import enum_field
 
 
 # ──────────────────────────────────────────────
@@ -21,7 +23,7 @@ from app.models.enums import GoalType
 class GoalCreateRequest(BaseModel):
     """목표 생성 요청."""
 
-    type: GoalType
+    type: GoalType = enum_field(GoalType)
     title: str = Field(..., min_length=1, max_length=200)
     target_amount: int = Field(..., gt=0)
     start_date: date
@@ -44,7 +46,7 @@ class GoalUpdateRequest(BaseModel):
 # ──────────────────────────────────────────────
 
 
-class GoalResponse(BaseModel):
+class GoalResponse(UTCDatetimeResponse):
     """목표 응답."""
 
     id: UUID

@@ -19,6 +19,8 @@ from app.models.enums import (
     TransactionSource,
     TransactionType,
 )
+from app.schemas.common import UTCDatetimeResponse
+from app.schemas.enums import enum_field
 
 
 # ──────────────────────────────────────────────
@@ -29,7 +31,7 @@ from app.models.enums import (
 class CarExpenseDetailSchema(BaseModel):
     """차계부 상세 데이터 스키마."""
 
-    car_type: CarType
+    car_type: CarType = enum_field(CarType)
     fuel_amount_liter: Decimal | None = None
     fuel_unit_price: int | None = None
     odometer: int | None = None
@@ -39,8 +41,8 @@ class CarExpenseDetailSchema(BaseModel):
 class CeremonyEventSchema(BaseModel):
     """경조사 이벤트 상세 데이터 스키마."""
 
-    direction: CeremonyDirection
-    event_type: CeremonyEventType
+    direction: CeremonyDirection = enum_field(CeremonyDirection)
+    event_type: CeremonyEventType = enum_field(CeremonyEventType)
     person_name: str
     relationship: str
     venue: str | None = None
@@ -55,8 +57,8 @@ class TransactionCreateRequest(BaseModel):
     """거래 생성 요청 스키마."""
 
     date: Date
-    area: Area
-    type: TransactionType
+    area: Area = enum_field(Area)
+    type: TransactionType = enum_field(TransactionType)
     major_category: str
     minor_category: str = ""
     description: str = ""
@@ -87,8 +89,8 @@ class TransactionUpdateRequest(BaseModel):
     """거래 수정 요청 스키마 (부분 업데이트)."""
 
     date: Date | None = None
-    area: Area | None = None
-    type: TransactionType | None = None
+    area: Area | None = enum_field(Area, default=None)
+    type: TransactionType | None = enum_field(TransactionType, default=None)
     major_category: str | None = None
     minor_category: str | None = None
     description: str | None = None
@@ -106,8 +108,8 @@ class TransactionFilterParams(BaseModel):
 
     start_date: Date | None = None
     end_date: Date | None = None
-    area: Area | None = None
-    type: TransactionType | None = None
+    area: Area | None = enum_field(Area, default=None)
+    type: TransactionType | None = enum_field(TransactionType, default=None)
     major_category: str | None = None
     asset_id: UUID | None = None
     family_group: bool = False
@@ -120,7 +122,7 @@ class TransactionFilterParams(BaseModel):
 # ──────────────────────────────────────────────
 
 
-class TransactionResponse(BaseModel):
+class TransactionResponse(UTCDatetimeResponse):
     """거래 응답 스키마."""
 
     id: int

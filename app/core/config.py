@@ -46,6 +46,34 @@ class Settings(BaseSettings):
     BEDROCK_REGION: str = "us-east-1"
     BEDROCK_TIMEOUT: int = 30
 
+    # OAuth — 카카오
+    KAKAO_CLIENT_ID: str | None = None
+    KAKAO_CLIENT_SECRET: str | None = None
+    KAKAO_REDIRECT_URI: str | None = None
+
+    # OAuth — 네이버
+    NAVER_CLIENT_ID: str | None = None
+    NAVER_CLIENT_SECRET: str | None = None
+    NAVER_REDIRECT_URI: str | None = None
+
+    # OAuth — 구글
+    GOOGLE_CLIENT_ID: str | None = None
+    GOOGLE_CLIENT_SECRET: str | None = None
+    GOOGLE_REDIRECT_URI: str | None = None
+
+    # OAuth — 애플 (client_secret 대신 JWT 생성에 TEAM_ID, KEY_ID, PRIVATE_KEY 사용)
+    APPLE_CLIENT_ID: str | None = None  # Apple Services ID (예: com.example.moneylog)
+    APPLE_TEAM_ID: str | None = None  # Apple Developer Team ID
+    APPLE_KEY_ID: str | None = None  # Apple Sign In 키 ID
+    APPLE_PRIVATE_KEY: str | None = None  # Apple P-256 개인 키 (PEM 형식)
+    APPLE_REDIRECT_URI: str | None = None
+
+    # S3 (프로필 이미지 업로드)
+    S3_BUCKET_NAME: str | None = None
+    S3_REGION: str = "ap-northeast-2"
+    S3_PROFILE_IMAGE_MAX_SIZE: int = 5 * 1024 * 1024  # 5MB
+    S3_PRESIGNED_URL_EXPIRES: int = 300  # 초
+
     # CORS 허용 오리진 (쉼표 구분, 운영 환경에서 도메인 목록 지정)
     ALLOWED_ORIGINS: str = "*"
 

@@ -10,6 +10,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.common import UTCDatetimeResponse
+
 
 # ──────────────────────────────────────────────
 # 요청 스키마
@@ -35,7 +37,7 @@ class JoinGroupRequest(BaseModel):
 # ──────────────────────────────────────────────
 
 
-class FamilyGroupResponse(BaseModel):
+class FamilyGroupResponse(UTCDatetimeResponse):
     """가족 그룹 응답 스키마."""
 
     id: UUID
@@ -46,7 +48,7 @@ class FamilyGroupResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class MemberResponse(BaseModel):
+class MemberResponse(UTCDatetimeResponse):
     """멤버 응답 스키마."""
 
     id: UUID
@@ -58,7 +60,7 @@ class MemberResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class InviteCodeResponse(BaseModel):
+class InviteCodeResponse(UTCDatetimeResponse):
     """초대 코드 응답 스키마."""
 
     invite_code: str

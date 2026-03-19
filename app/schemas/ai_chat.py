@@ -9,13 +9,15 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.common import UTCDatetimeResponse
+
 
 class ChatSessionCreateRequest(BaseModel):
     """채팅 세션 생성 요청."""
     title: str | None = Field(None, max_length=200)
 
 
-class ChatSessionResponse(BaseModel):
+class ChatSessionResponse(UTCDatetimeResponse):
     """채팅 세션 응답."""
     id: UUID
     user_id: UUID
@@ -45,7 +47,7 @@ class ExtractedTransactionData(BaseModel):
     asset_id: UUID | None = None
 
 
-class ChatMessageResponse(BaseModel):
+class ChatMessageResponse(UTCDatetimeResponse):
     """채팅 메시지 응답."""
     id: UUID
     session_id: UUID

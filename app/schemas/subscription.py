@@ -15,6 +15,8 @@ from app.models.enums import (
     SubscriptionCycle,
     SubscriptionStatus,
 )
+from app.schemas.common import UTCDatetimeResponse
+from app.schemas.enums import enum_field
 
 
 # ──────────────────────────────────────────────
@@ -26,14 +28,16 @@ class SubscriptionCreateRequest(BaseModel):
     """구독 생성 요청 스키마."""
 
     service_name: str = Field(..., min_length=1, max_length=100)
-    category: SubscriptionCategory
+    category: SubscriptionCategory = enum_field(SubscriptionCategory)
     amount: int = Field(..., gt=0)
-    cycle: SubscriptionCycle
+    cycle: SubscriptionCycle = enum_field(SubscriptionCycle)
     billing_day: int = Field(..., ge=1, le=31)
     asset_id: UUID | None = None
     start_date: Date
     end_date: Date | None = None
-    status: SubscriptionStatus = SubscriptionStatus.ACTIVE
+    status: SubscriptionStatus = enum_field(
+        SubscriptionStatus, default=SubscriptionStatus.ACTIVE
+    )
     notify_before_days: int = Field(default=1, ge=0, le=30)
     memo: str | None = None
 
@@ -42,14 +46,14 @@ class SubscriptionUpdateRequest(BaseModel):
     """구독 수정 요청 스키마 (부분 업데이트)."""
 
     service_name: str | None = Field(None, min_length=1, max_length=100)
-    category: SubscriptionCategory | None = None
+    category: SubscriptionCategory | None = enum_field(SubscriptionCategory, default=None)
     amount: int | None = Field(None, gt=0)
-    cycle: SubscriptionCycle | None = None
+    cycle: SubscriptionCycle | None = enum_field(SubscriptionCycle, default=None)
     billing_day: int | None = Field(None, ge=1, le=31)
     asset_id: UUID | None = None
     start_date: Date | None = None
     end_date: Date | None = None
-    status: SubscriptionStatus | None = None
+    status: SubscriptionStatus | None = enum_field(SubscriptionStatus, default=None)
     notify_before_days: int | None = Field(None, ge=0, le=30)
     memo: str | None = None
 
@@ -65,7 +69,7 @@ class BatchProcessRequest(BaseModel):
 # ──────────────────────────────────────────────
 
 
-class SubscriptionResponse(BaseModel):
+class SubscriptionResponse(UTCDatetimeResponse):
     """구독 응답 스키마."""
 
     id: UUID

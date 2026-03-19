@@ -10,13 +10,15 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
+from app.schemas.common import UTCDatetimeResponse
+
 
 # ──────────────────────────────────────────────
 # 응답 스키마
 # ──────────────────────────────────────────────
 
 
-class NotificationResponse(BaseModel):
+class NotificationResponse(UTCDatetimeResponse):
     """알림 응답 스키마."""
 
     id: UUID

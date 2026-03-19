@@ -30,6 +30,7 @@ from app.api.ai_chat import router as ai_chat_router
 from app.api.receipts import router as receipts_router
 from app.api.ai_analysis import router as ai_analysis_router
 from app.api.ai_feedbacks import router as ai_feedbacks_router
+from app.api.upload import router as upload_router
 from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
 
@@ -96,6 +97,8 @@ def create_app() -> FastAPI:
     api_v1_router.include_router(receipts_router)
     api_v1_router.include_router(ai_analysis_router)
     api_v1_router.include_router(ai_feedbacks_router)
+    # 프론트엔드 연동 개선 라우터
+    api_v1_router.include_router(upload_router)
 
     # API v1 라우터 등록
     application.include_router(api_v1_router)

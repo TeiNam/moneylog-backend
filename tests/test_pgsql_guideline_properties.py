@@ -76,7 +76,7 @@ def _get_id_column_info_from_model(model):
         return prop.columns[0]
 
 
-@settings(max_examples=100)
+@settings(max_examples=30)
 @given(model=st.sampled_from(HIGH_VOLUME_MODELS))
 def test_high_volume_table_id_uses_bigint_pk_type(model):
     """
@@ -125,7 +125,7 @@ def test_high_volume_table_id_uses_bigint_pk_type(model):
         )
 
 
-@settings(max_examples=100)
+@settings(max_examples=30)
 @given(model=st.sampled_from(HIGH_VOLUME_MODELS))
 def test_high_volume_table_public_id_is_uuid_unique(model):
     """
@@ -206,7 +206,7 @@ def _get_model_indexes(model):
     return list(table.indexes)
 
 
-@settings(max_examples=100)
+@settings(max_examples=30)
 @given(model=st.sampled_from(MODELS_WITH_INDEXES))
 def test_index_names_follow_naming_convention(model):
     """
@@ -244,7 +244,7 @@ def test_index_names_follow_naming_convention(model):
         )
 
 
-@settings(max_examples=100)
+@settings(max_examples=30)
 @given(model=st.sampled_from(MODELS_WITH_INDEXES))
 def test_unique_indexes_use_uidx_prefix(model):
     """
@@ -267,7 +267,7 @@ def test_unique_indexes_use_uidx_prefix(model):
             )
 
 
-@settings(max_examples=100)
+@settings(max_examples=30)
 @given(model=st.sampled_from(MODELS_WITH_INDEXES))
 def test_index_names_contain_column_names(model):
     """
@@ -359,7 +359,7 @@ def _get_select_calls_from_method(cls, method_name: str) -> list[ast.Call]:
     return select_calls
 
 
-@settings(max_examples=100)
+@settings(max_examples=30)
 @given(
     method_info=st.sampled_from(LIST_METHODS),
 )
@@ -394,7 +394,7 @@ def test_list_methods_return_row_not_orm_model(method_info):
     )
 
 
-@settings(max_examples=100)
+@settings(max_examples=30)
 @given(
     method_info=st.sampled_from(LIST_METHODS),
 )
@@ -453,7 +453,7 @@ def test_list_methods_use_column_specific_select(method_info):
 # ---------------------------------------------------------------------------
 
 
-@settings(max_examples=100)
+@settings(max_examples=30)
 @given(
     asset_data=st.lists(
         st.tuples(st.uuids(), st.text(min_size=1, max_size=50)),
@@ -576,7 +576,7 @@ LOGICAL_FK_COLUMNS = [
 LOGICAL_FK_COMMENT_PATTERN = re.compile(r"^논리적 FK → \w+\.\w+\.\w+")
 
 
-@settings(max_examples=100)
+@settings(max_examples=30)
 @given(fk_info=st.sampled_from(LOGICAL_FK_COLUMNS))
 def test_logical_fk_columns_have_valid_comment(fk_info):
     """

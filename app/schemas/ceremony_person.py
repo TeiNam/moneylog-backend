@@ -8,7 +8,9 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
+
+from app.schemas.common import UTCDatetimeResponse
 
 
 # ──────────────────────────────────────────────
@@ -16,7 +18,7 @@ from pydantic import BaseModel, ConfigDict
 # ──────────────────────────────────────────────
 
 
-class CeremonyPersonResponse(BaseModel):
+class CeremonyPersonResponse(UTCDatetimeResponse):
     """경조사 인물 응답 스키마."""
 
     id: UUID

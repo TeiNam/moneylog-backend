@@ -6,9 +6,10 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
 from app.schemas.ai_chat import ExtractedTransactionData
+from app.schemas.common import UTCDatetimeResponse
 
 
-class ReceiptScanResponse(BaseModel):
+class ReceiptScanResponse(UTCDatetimeResponse):
     """영수증 스캔 응답."""
     id: UUID
     user_id: UUID

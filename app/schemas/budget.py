@@ -10,6 +10,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.common import UTCDatetimeResponse
+
 
 # ──────────────────────────────────────────────
 # 요청 스키마
@@ -38,7 +40,7 @@ class BudgetUpdateRequest(BaseModel):
 # ──────────────────────────────────────────────
 
 
-class BudgetResponse(BaseModel):
+class BudgetResponse(UTCDatetimeResponse):
     """예산 응답."""
 
     id: UUID

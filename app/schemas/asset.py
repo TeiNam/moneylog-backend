@@ -11,6 +11,8 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.enums import AssetType, Ownership
+from app.schemas.common import UTCDatetimeResponse
+from app.schemas.enums import enum_field
 
 
 # ──────────────────────────────────────────────
@@ -22,9 +24,9 @@ class AssetCreateRequest(BaseModel):
     """자산 생성 요청 스키마."""
 
     name: str = Field(..., min_length=1, description="자산 이름")
-    asset_type: AssetType = Field(..., description="자산 유형")
-    ownership: Ownership = Field(
-        default=Ownership.PERSONAL, description="소유권 구분"
+    asset_type: AssetType = enum_field(AssetType, description="자산 유형")
+    ownership: Ownership = enum_field(
+        Ownership, default=Ownership.PERSONAL, description="소유권 구분"
     )
     family_group_id: UUID | None = None
     institution: str | None = Field(default=None, description="금융기관명")
@@ -40,7 +42,7 @@ class AssetUpdateRequest(BaseModel):
     """자산 수정 요청 스키마 (부분 업데이트)."""
 
     name: str | None = None
-    asset_type: AssetType | None = None
+    asset_type: AssetType | None = enum_field(AssetType, default=None)
     institution: str | None = None
     balance: int | None = None
     memo: str | None = None
@@ -69,7 +71,7 @@ class SortOrderItem(BaseModel):
 # ──────────────────────────────────────────────
 
 
-class AssetResponse(BaseModel):
+class AssetResponse(UTCDatetimeResponse):
     """자산 응답 스키마."""
 
     id: UUID

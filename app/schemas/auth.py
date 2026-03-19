@@ -11,6 +11,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
+from app.schemas.common import UTCDatetimeResponse
+
 
 # ──────────────────────────────────────────────
 # 요청 스키마
@@ -91,7 +93,7 @@ class UpdateProfileRequest(BaseModel):
 # ──────────────────────────────────────────────
 
 
-class UserResponse(BaseModel):
+class UserResponse(UTCDatetimeResponse):
     """사용자 정보 응답 스키마."""
 
     id: UUID

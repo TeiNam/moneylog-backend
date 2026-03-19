@@ -26,6 +26,7 @@ from app.schemas.transaction import (
     TransactionUpdateRequest,
 )
 from app.services.transaction_service import TransactionService
+from app.utils.timezone_utils import parse_date_param_to_date
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
@@ -62,8 +63,8 @@ async def create_transaction(
     summary="거래 목록 조회",
 )
 async def list_transactions(
-    start_date: date | None = Query(None),
-    end_date: date | None = Query(None),
+    start_date: str | None = Query(None, description="시작일 (YYYY-MM-DD 또는 ISO 8601)"),
+    end_date: str | None = Query(None, description="종료일 (YYYY-MM-DD 또는 ISO 8601)"),
     area: Area | None = Query(None),
     type: TransactionType | None = Query(None),
     major_category: str | None = Query(None),
@@ -74,10 +75,23 @@ async def list_transactions(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """필터링 및 페이지네이션을 적용하여 거래 목록을 조회한다."""
+    """필터링 및 페이지네이션을 적용하여 거래 목록을 조회한다.
+
+    날짜 파라미터는 KST 기준으로 해석된다:
+    - YYYY-MM-DD: KST 기준 날짜로 해석
+    - ISO 8601 (타임존 포함): 해당 타임존을 KST로 변환 후 날짜 추출
+    """
+    # KST 기준 날짜 파싱 (Requirements 4.2, 4.3)
+    parsed_start: date | None = None
+    parsed_end: date | None = None
+    if start_date is not None:
+        parsed_start = parse_date_param_to_date(start_date)
+    if end_date is not None:
+        parsed_end = parse_date_param_to_date(end_date)
+
     filters = TransactionFilterParams(
-        start_date=start_date,
-        end_date=end_date,
+        start_date=parsed_start,
+        end_date=parsed_end,
         area=area,
         type=type,
         major_category=major_category,

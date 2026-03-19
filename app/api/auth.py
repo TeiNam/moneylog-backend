@@ -30,6 +30,8 @@ from app.schemas.auth import (
 from app.services.auth_service import EmailAuthService
 from app.services.asset_service import AssetService
 from app.services.category_service import CategoryService
+from app.services.s3_service import S3Service
+from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -196,9 +198,61 @@ async def update_profile(
     db: AsyncSession = Depends(get_db),
 ) -> UserResponse:
     """닉네임, 프로필 이미지 등 사용자 프로필 정보를 수정한다."""
+    # 프로필 이미지 URL이 제공된 경우 S3 도메인 검증
+    if body.profile_image is not None:
+        settings = get_settings()
+        s3_service = S3Service(settings)
+        if not s3_service.validate_s3_domain(body.profile_image):
+            from app.core.exceptions import BadRequestError
+            raise BadRequestError(
+                detail="유효하지 않은 프로필 이미지 URL입니다"
+            )
+
     repo = UserRepository(db)
     service = EmailAuthService(repo)
     updated_user = await service.update_profile(current_user, body)
     await db.commit()
     return UserResponse.model_validate(updated_user)
 
+
+# ---------------------------------------------------------------------------
+# OAuth 소셜 로그인 엔드포인트
+# ---------------------------------------------------------------------------
+
+from app.models.enums import OAuthProvider
+from app.schemas.oauth import OAuthAuthorizationResponse, OAuthCallbackRequest
+from app.services.oauth_service import OAuthService
+
+
+@router.get(
+    "/oauth/{provider}/authorize",
+    response_model=OAuthAuthorizationResponse,
+    summary="OAuth 인가 URL 반환",
+)
+async def oauth_authorize(provider: OAuthProvider) -> OAuthAuthorizationResponse:
+    """OAuth 제공자의 인가 URL을 반환한다."""
+    settings = get_settings()
+    # OAuthService는 user_repo가 필요하지만 인가 URL 생성에는 불필요
+    # 임시 None 전달 (get_authorization_url은 user_repo를 사용하지 않음)
+    oauth_service = OAuthService(user_repo=None, settings=settings)  # type: ignore[arg-type]
+    authorization_url = oauth_service.get_authorization_url(provider)
+    return OAuthAuthorizationResponse(authorization_url=authorization_url)
+
+
+@router.post(
+    "/oauth/{provider}/callback",
+    response_model=TokenResponse,
+    summary="OAuth 콜백 처리",
+)
+async def oauth_callback(
+    provider: OAuthProvider,
+    body: OAuthCallbackRequest,
+    db: AsyncSession = Depends(get_db),
+) -> TokenResponse:
+    """OAuth 인가 코드로 로그인/가입을 처리한다."""
+    settings = get_settings()
+    repo = UserRepository(db)
+    oauth_service = OAuthService(user_repo=repo, settings=settings)
+    token_response = await oauth_service.authenticate(provider, body.code)
+    await db.commit()
+    return token_response
