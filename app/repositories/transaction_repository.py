@@ -389,4 +389,37 @@ class TransactionRepository:
         # 컬럼 명시 조회 시 Row 객체 반환 (scalars() 대신 all() 사용)
         return list(result.all())
 
+    # ──────────────────────────────────────────────
+    # 집계
+    # ──────────────────────────────────────────────
 
+    async def sum_actual_amount(
+        self,
+        user_id: UUID,
+        asset_id: UUID,
+        start_date: date,
+        end_date: date,
+    ) -> int:
+        """특정 자산의 기간 내 actual_amount 합계를 반환한다.
+
+        거래가 없으면 0을 반환한다.
+
+        Args:
+            user_id: 사용자 ID
+            asset_id: 자산 ID
+            start_date: 시작일
+            end_date: 종료일
+
+        Returns:
+            actual_amount 합계
+        """
+        stmt = select(
+            func.coalesce(func.sum(Transaction.actual_amount), 0)
+        ).where(
+            Transaction.user_id == user_id,
+            Transaction.asset_id == asset_id,
+            Transaction.date >= start_date,
+            Transaction.date <= end_date,
+        )
+        result = await self._session.execute(stmt)
+        return result.scalar_one()

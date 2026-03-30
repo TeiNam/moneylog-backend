@@ -49,6 +49,9 @@ from app.models.chat_message import ChatMessage  # noqa: F401
 from app.models.receipt_scan import ReceiptScan  # noqa: F401
 from app.models.ai_feedback import AIFeedback  # noqa: F401
 
+# 카드 결제 주기 모델 등록
+from app.models.billing_discount import BillingDiscount  # noqa: F401
+
 # ---------------------------------------------------------------------------
 # 테스트용 SQLite async 인메모리 DB 설정
 # ---------------------------------------------------------------------------

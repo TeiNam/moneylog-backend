@@ -71,5 +71,15 @@ class Asset(Base):
     sort_order: Mapped[int] = mapped_column(
         Integer, nullable=False, comment="정렬 순서"
     )
+    payment_day: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        comment="결제일 (1~31, 카드 유형만 사용)",
+    )
+    billing_start_day: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        comment="사용 기준일 (1~31, 카드 유형만 사용)",
+    )
     created_at: Mapped[created_at]
     updated_at: Mapped[nullable_timestamp]
