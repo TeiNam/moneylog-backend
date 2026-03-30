@@ -5,14 +5,19 @@ OAuth 2.0 소셜 로그인 서비스.
 인가 코드 → 토큰 교환 → 프로필 조회 → 로그인/가입 → JWT 발급 흐름을 구현한다.
 """
 
+import hashlib
+import hmac
 import logging
+import secrets
+import time
 from datetime import datetime, timedelta, timezone
 
 import httpx
-from jose import jwt as jose_jwt
+import jwt
+from jwt import PyJWKClient
 
 from app.core.config import Settings
-from app.core.exceptions import ConflictError, ExternalServiceError
+from app.core.exceptions import BadRequestError, ConflictError, ExternalServiceError
 from app.core.security import create_access_token, create_refresh_token
 from app.models.enums import OAuthProvider
 from app.repositories.user_repository import UserRepository
@@ -20,6 +25,9 @@ from app.schemas.auth import TokenResponse
 from app.schemas.oauth import OAuthUserProfile
 
 logger = logging.getLogger(__name__)
+
+# Apple JWKS 엔드포인트 (id_token 서명 검증용 공개 키 조회)
+APPLE_JWKS_URL = "https://appleid.apple.com/auth/keys"
 
 # ---------------------------------------------------------------------------
 # 제공자별 URL 상수
@@ -60,49 +68,62 @@ class OAuthService:
     # 인가 URL 생성
     # ------------------------------------------------------------------
 
-    def get_authorization_url(self, provider: OAuthProvider) -> str:
-        """OAuth 제공자의 인가 URL을 반환한다."""
+    def get_authorization_url(self, provider: OAuthProvider) -> tuple[str, str]:
+        """OAuth 제공자의 인가 URL과 CSRF 방어용 state를 반환한다."""
         base_url = AUTHORIZATION_URLS[provider]
         client_id = self._get_client_id(provider)
         redirect_uri = self._get_redirect_uri(provider)
+
+        # HMAC 서명이 포함된 state 생성 (서버 측 검증 가능, stateless)
+        state = self._generate_signed_state()
 
         params = {
             "client_id": client_id,
             "redirect_uri": redirect_uri,
             "response_type": "code",
+            "state": state,
         }
 
         # 제공자별 추가 파라미터
         if provider == OAuthProvider.GOOGLE:
             params["scope"] = "openid email profile"
-        elif provider == OAuthProvider.NAVER:
-            params["state"] = "moneylog"
         elif provider == OAuthProvider.APPLE:
             params["scope"] = "name email"
             params["response_mode"] = "form_post"
 
         query_string = "&".join(f"{k}={v}" for k, v in params.items())
-        return f"{base_url}?{query_string}"
+        return f"{base_url}?{query_string}", state
 
     # ------------------------------------------------------------------
     # 인증 메인 플로우
     # ------------------------------------------------------------------
 
     async def authenticate(
-        self, provider: OAuthProvider, code: str
+        self, provider: OAuthProvider, code: str, expected_state: str | None = None
     ) -> TokenResponse:
         """
         인가 코드로 OAuth 인증을 수행한다.
 
-        1. 인가 코드 → 액세스 토큰 교환
-        2. 액세스 토큰으로 사용자 프로필 조회
-        3. 기존 사용자 확인 → 로그인 또는 신규 생성
-        4. JWT 토큰 발급
+        1. state 검증 (CSRF 방어)
+        2. 인가 코드 → 액세스 토큰 교환
+        3. 액세스 토큰으로 사용자 프로필 조회
+        4. 기존 사용자 확인 → 로그인 또는 신규 생성
+        5. JWT 토큰 발급
+
+        Args:
+            provider: OAuth 제공자
+            code: 인가 코드
+            expected_state: 클라이언트가 저장한 state (CSRF 검증용)
 
         Raises:
+            BadRequestError: state가 없거나 비어있는 경우
             ConflictError: 이메일/비밀번호로 이미 가입된 계정
             ExternalServiceError: OAuth 제공자 통신 오류
         """
+        # 0. CSRF state 서명 검증 (서버가 발급한 state인지, 만료되지 않았는지 확인)
+        if expected_state is None or not self._verify_signed_state(expected_state):
+            raise BadRequestError(detail="OAuth state 파라미터가 유효하지 않습니다")
+
         # 1. 인가 코드 → 토큰 교환
         token_data = await self._exchange_code_for_token(provider, code)
 
@@ -301,7 +322,8 @@ class OAuthService:
             "alg": "ES256",
             "kid": self._settings.APPLE_KEY_ID,
         }
-        return jose_jwt.encode(
+        # PyJWT의 jwt.encode()로 Apple client_secret JWT 생성
+        return jwt.encode(
             payload,
             self._settings.APPLE_PRIVATE_KEY,
             algorithm="ES256",
@@ -310,18 +332,33 @@ class OAuthService:
 
     def _decode_apple_id_token(self, id_token: str) -> dict:
         """
-        Apple id_token(JWT)을 디코딩하여 claims를 추출한다.
+        Apple id_token(JWT)을 JWKS 공개 키로 서명 검증 후 claims를 추출한다.
 
-        검증 없이 디코딩한다 (Apple 공개 키 검증은 프로덕션에서 추가 가능).
+        Apple JWKS 엔드포인트에서 공개 키를 조회하고, RS256 서명 검증,
+        iss(발급자) 및 aud(대상) 검증을 수행한다.
 
         추출하는 주요 claims:
         - sub: Apple 고유 사용자 식별자
         - email: 사용자 이메일 (Private Email Relay 시 프록시 이메일)
         - email_verified: 이메일 인증 여부
         - is_private_email: Private Email Relay 사용 여부
+
+        Raises:
+            ExternalServiceError: 서명 검증 실패, iss/aud 불일치, JWKS 조회 실패 등
         """
         try:
-            claims = jose_jwt.get_unverified_claims(id_token)
+            # Apple JWKS에서 id_token의 kid에 해당하는 공개 키 조회
+            jwks_client = PyJWKClient(APPLE_JWKS_URL)
+            signing_key = jwks_client.get_signing_key_from_jwt(id_token)
+
+            # RS256 서명 검증 + iss/aud 검증
+            claims = jwt.decode(
+                id_token,
+                signing_key.key,
+                algorithms=["RS256"],
+                audience=self._settings.APPLE_CLIENT_ID,
+                issuer="https://appleid.apple.com",
+            )
             return {
                 "sub": claims.get("sub", ""),
                 "email": claims.get("email"),
@@ -329,7 +366,7 @@ class OAuthService:
                 "is_private_email": claims.get("is_private_email", False),
             }
         except Exception as exc:
-            logger.error("Apple id_token 디코딩 실패: %s", exc)
+            logger.error("Apple id_token 검증 실패: %s", exc)
             raise ExternalServiceError(
                 detail="소셜 로그인 처리 중 오류가 발생했습니다"
             ) from exc
@@ -368,6 +405,69 @@ class OAuthService:
 
         # 도달하지 않아야 하는 분기
         raise ExternalServiceError(detail="지원하지 않는 OAuth 제공자입니다")
+
+    # ------------------------------------------------------------------
+    # OAuth state HMAC 서명 (stateless CSRF 방어)
+    # ------------------------------------------------------------------
+
+    def _generate_signed_state(self, max_age: int = 600) -> str:
+        """HMAC 서명이 포함된 OAuth state를 생성한다.
+
+        형식: {nonce}:{timestamp}:{signature}
+        - nonce: 랜덤 16바이트 (URL-safe base64)
+        - timestamp: Unix 타임스탬프 (초)
+        - signature: HMAC-SHA256(nonce:timestamp, JWT_SECRET_KEY)의 앞 16자
+
+        Args:
+            max_age: state 유효 시간 (초, 기본 10분)
+        """
+        nonce = secrets.token_urlsafe(16)
+        timestamp = str(int(time.time()))
+        message = f"{nonce}:{timestamp}"
+        signature = hmac.new(
+            self._settings.JWT_SECRET_KEY.encode(),
+            message.encode(),
+            hashlib.sha256,
+        ).hexdigest()[:16]
+        return f"{message}:{signature}"
+
+    def _verify_signed_state(self, state: str, max_age: int = 600) -> bool:
+        """OAuth state의 HMAC 서명과 만료를 검증한다.
+
+        Args:
+            state: 클라이언트가 돌려보낸 state 문자열
+            max_age: state 유효 시간 (초, 기본 10분)
+
+        Returns:
+            True: 서명 유효 + 만료되지 않음
+            False: 서명 불일치 또는 만료
+        """
+        parts = state.split(":")
+        if len(parts) != 3:
+            return False
+        nonce, timestamp_str, signature = parts
+
+        # 타임스탬프 파싱 실패 시 거부
+        try:
+            ts = int(timestamp_str)
+        except ValueError:
+            return False
+
+        # 서명 재계산 후 비교 (타이밍 공격 방지를 위해 hmac.compare_digest 사용)
+        message = f"{nonce}:{timestamp_str}"
+        expected = hmac.new(
+            self._settings.JWT_SECRET_KEY.encode(),
+            message.encode(),
+            hashlib.sha256,
+        ).hexdigest()[:16]
+        if not hmac.compare_digest(signature, expected):
+            return False
+
+        # 만료 검증
+        if int(time.time()) - ts > max_age:
+            return False
+
+        return True
 
     # ------------------------------------------------------------------
     # 헬퍼: 제공자별 설정값 조회

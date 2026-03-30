@@ -80,6 +80,10 @@ class Settings(BaseSettings):
     # 구독 배치 API 인증 키
     BATCH_API_KEY: str = ""
 
+    # Rate Limiting (인증 엔드포인트 보호)
+    RATE_LIMIT_REQUESTS: int = 10  # 윈도우당 최대 요청 수
+    RATE_LIMIT_WINDOW_SECONDS: int = 60  # 슬라이딩 윈도우 크기 (초)
+
     # 앱
     APP_ENV: str = "development"  # development / staging / production
     DEBUG: bool = False

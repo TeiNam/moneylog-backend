@@ -98,6 +98,13 @@ class ConflictError(AppException):
         super().__init__(status_code=409, detail=detail)
 
 
+class RateLimitExceededError(AppException):
+    """요청 빈도 제한 초과 시 발생 (429 Too Many Requests)."""
+
+    def __init__(self, detail: str = "요청이 너무 많습니다. 잠시 후 다시 시도해주세요") -> None:
+        super().__init__(status_code=429, detail=detail)
+
+
 class ExternalServiceError(AppException):
     """외부 서비스(S3, OAuth 제공자) 통신 오류 (502 Bad Gateway)."""
 

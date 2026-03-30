@@ -11,12 +11,14 @@ class OAuthCallbackRequest(BaseModel):
     """OAuth 콜백 요청 스키마."""
 
     code: str = Field(..., description="OAuth 인가 코드")
+    state: str = Field(..., description="CSRF 방어용 OAuth state 파라미터")
 
 
 class OAuthAuthorizationResponse(BaseModel):
     """OAuth 인가 URL 응답 스키마."""
 
     authorization_url: str = Field(..., description="OAuth 제공자 인가 URL")
+    state: str = Field(..., description="CSRF 방어용 OAuth state 파라미터")
 
 
 class OAuthUserProfile(BaseModel):

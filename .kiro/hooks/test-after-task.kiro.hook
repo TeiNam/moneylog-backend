@@ -1,0 +1,12 @@
+{
+  "name": "Test After Spec Task",
+  "version": "1.0.0",
+  "description": "스펙 태스크 완료 후 테스트 실행을 리마인드합니다.",
+  "when": {
+    "type": "postTaskExecution"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A spec task was completed. Remind the user to run tests manually in their terminal: pytest. Do NOT use executeBash or terminal to run tests directly — it may block or hang."
+  }
+}

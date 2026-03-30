@@ -2,7 +2,7 @@
 보안 모듈 — 비밀번호 해싱 및 JWT 토큰 관리.
 
 비밀번호: bcrypt 라이브러리 직접 사용 (passlib 호환성 이슈로 인해)
-JWT: python-jose 라이브러리 (HS256 알고리즘)
+JWT: PyJWT 라이브러리 (HS256 알고리즘)
 """
 
 import logging
@@ -10,7 +10,8 @@ import re
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import PyJWTError
 
 from app.core.config import get_settings
 from app.core.exceptions import InvalidCredentialsError
@@ -35,14 +36,19 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    """평문 비밀번호와 해시를 비교하여 일치 여부를 반환한다."""
+    """평문 비밀번호와 해시를 비교하여 일치 여부를 반환한다.
+
+    ValueError만 False로 처리하고 (bcrypt 잘못된 해시 형식),
+    그 외 예외(TypeError, RuntimeError 등)는 상위로 전파하여 실제 버그를 감지한다.
+    """
     try:
         return bcrypt.checkpw(
             plain.encode("utf-8"),
             hashed.encode("utf-8"),
         )
-    except Exception:
-        logger.warning("비밀번호 검증 중 오류 발생")
+    except ValueError:
+        # bcrypt 잘못된 해시 형식 등 정상적인 불일치 케이스
+        logger.warning("비밀번호 검증 중 ValueError 발생 (잘못된 해시 형식)")
         return False
 
 
@@ -149,6 +155,6 @@ def decode_token(token: str) -> dict:
             algorithms=[settings.JWT_ALGORITHM],
         )
         return payload
-    except JWTError as exc:
+    except PyJWTError as exc:
         logger.warning("JWT 디코딩 실패: %s", exc)
         raise InvalidCredentialsError(detail="유효하지 않은 토큰입니다") from exc

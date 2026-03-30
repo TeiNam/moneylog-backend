@@ -16,7 +16,7 @@ ENV/
 .env
 
 # Kiro
-.kiro/
+.kiro/specs
 
 # IDE
 .idea/

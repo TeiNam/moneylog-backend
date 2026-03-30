@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_user, get_db
+from app.core.rate_limit import rate_limit_dependency
 from app.models.user import User
 from app.repositories.asset_repository import AssetRepository
 from app.repositories.category_repository import CategoryRepository
@@ -32,6 +33,7 @@ from app.services.asset_service import AssetService
 from app.services.category_service import CategoryService
 from app.services.s3_service import S3Service
 from app.core.config import get_settings
+from app.core.exceptions import AppException
 
 logger = logging.getLogger(__name__)
 
@@ -47,27 +49,28 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 async def register(
     body: RegisterRequest,
     db: AsyncSession = Depends(get_db),
+    _rate_limit: None = Depends(rate_limit_dependency),
 ) -> UserResponse:
     """이메일/비밀번호로 회원가입을 수행한다."""
     repo = UserRepository(db)
     service = EmailAuthService(repo)
     user = await service.register(body.email, body.password, body.nickname)
 
-    # 회원가입 성공 후 기본 카테고리 시드 생성 (실패해도 회원가입은 유지)
+    # 회원가입 성공 후 기본 카테고리 시드 생성 (비즈니스 로직 실패만 허용, 인프라 오류는 전파)
     try:
         category_service = CategoryService(CategoryRepository(db))
         await category_service.seed_defaults(user.id)
-    except Exception:
+    except AppException:
         logger.warning(
             "기본 카테고리 시드 생성 실패: user_id=%s (회원가입은 정상 처리)",
             user.id,
         )
 
-    # 기본 자산(현금) 시드 생성 및 default_asset_id 설정 (실패해도 회원가입은 유지)
+    # 기본 자산(현금) 시드 생성 및 default_asset_id 설정 (비즈니스 로직 실패만 허용, 인프라 오류는 전파)
     try:
         asset_service = AssetService(AssetRepository(db), repo)
         await asset_service.seed_defaults(user.id)
-    except Exception:
+    except AppException:
         logger.warning(
             "기본 자산 시드 생성 실패: user_id=%s (회원가입은 정상 처리)",
             user.id,
@@ -85,6 +88,7 @@ async def register(
 async def login(
     body: LoginRequest,
     db: AsyncSession = Depends(get_db),
+    _rate_limit: None = Depends(rate_limit_dependency),
 ) -> TokenResponse:
     """이메일/비밀번호로 로그인하여 토큰을 발급한다."""
     repo = UserRepository(db)
@@ -101,6 +105,7 @@ async def login(
 async def verify_email(
     body: VerifyEmailRequest,
     db: AsyncSession = Depends(get_db),
+    _rate_limit: None = Depends(rate_limit_dependency),
 ) -> dict:
     """이메일 인증 코드를 검증한다."""
     repo = UserRepository(db)
@@ -235,8 +240,8 @@ async def oauth_authorize(provider: OAuthProvider) -> OAuthAuthorizationResponse
     # OAuthService는 user_repo가 필요하지만 인가 URL 생성에는 불필요
     # 임시 None 전달 (get_authorization_url은 user_repo를 사용하지 않음)
     oauth_service = OAuthService(user_repo=None, settings=settings)  # type: ignore[arg-type]
-    authorization_url = oauth_service.get_authorization_url(provider)
-    return OAuthAuthorizationResponse(authorization_url=authorization_url)
+    authorization_url, state = oauth_service.get_authorization_url(provider)
+    return OAuthAuthorizationResponse(authorization_url=authorization_url, state=state)
 
 
 @router.post(
@@ -253,6 +258,6 @@ async def oauth_callback(
     settings = get_settings()
     repo = UserRepository(db)
     oauth_service = OAuthService(user_repo=repo, settings=settings)
-    token_response = await oauth_service.authenticate(provider, body.code)
+    token_response = await oauth_service.authenticate(provider, body.code, expected_state=body.state)
     await db.commit()
     return token_response

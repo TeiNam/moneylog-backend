@@ -49,6 +49,11 @@ async def get_current_user(
     # decode_token은 실패 시 InvalidCredentialsError를 발생시킴
     payload = decode_token(token)
 
+    # 토큰 타입 검증: access 토큰만 허용, refresh 등 다른 타입은 거부
+    token_type = payload.get("type")
+    if token_type != "access":
+        raise InvalidCredentialsError(detail="유효하지 않은 토큰입니다")
+
     user_id_str = payload.get("sub")
     if not user_id_str:
         raise InvalidCredentialsError(detail="유효하지 않은 토큰입니다")

@@ -42,7 +42,8 @@ async def test_authorize_returns_url_for_each_provider(client, provider):
     with patch("app.api.auth.OAuthService") as MockOAuthService:
         mock_instance = MockOAuthService.return_value
         mock_instance.get_authorization_url.return_value = (
-            f"https://example.com/oauth/{provider.lower()}/authorize?client_id=test"
+            f"https://example.com/oauth/{provider.lower()}/authorize?client_id=test",
+            "test-csrf-state",
         )
 
         response = await client.get(f"/api/v1/auth/oauth/{provider}/authorize")
@@ -51,6 +52,7 @@ async def test_authorize_returns_url_for_each_provider(client, provider):
 
     body = response.json()
     assert "authorization_url" in body
+    assert "state" in body
     assert provider.lower() in body["authorization_url"]
 
 
@@ -74,7 +76,7 @@ async def test_callback_returns_token_response(client, provider):
 
         response = await client.post(
             f"/api/v1/auth/oauth/{provider}/callback",
-            json={"code": "test-auth-code"},
+            json={"code": "test-auth-code", "state": "test-csrf-state"},
         )
 
     assert response.status_code == 200
@@ -101,7 +103,7 @@ async def test_callback_conflict_returns_409(client):
 
         response = await client.post(
             "/api/v1/auth/oauth/KAKAO/callback",
-            json={"code": "test-auth-code"},
+            json={"code": "test-auth-code", "state": "test-csrf-state"},
         )
 
     assert response.status_code == 409
@@ -129,7 +131,7 @@ async def test_callback_external_error_returns_502(client):
 
         response = await client.post(
             "/api/v1/auth/oauth/GOOGLE/callback",
-            json={"code": "invalid-code"},
+            json={"code": "invalid-code", "state": "test-csrf-state"},
         )
 
     assert response.status_code == 502

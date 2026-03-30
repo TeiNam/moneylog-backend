@@ -12,8 +12,17 @@ WORKDIR /app
 COPY pyproject.toml ./
 RUN pip install --no-cache-dir .
 
+# non-root 사용자 생성 (보안: 컨테이너 권한 상승 방지)
+RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
+
 # 애플리케이션 코드 복사
 COPY . .
+
+# 파일 소유권을 non-root 사용자로 변경
+RUN chown -R appuser:appgroup /app
+
+# non-root 사용자로 전환
+USER appuser
 
 EXPOSE 8000
 
